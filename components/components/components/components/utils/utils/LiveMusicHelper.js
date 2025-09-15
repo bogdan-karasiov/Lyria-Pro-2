@@ -99,7 +99,9 @@ export class LiveMusicHelper extends EventTarget {
         if (this.nextStartTime === 0) {
             this.nextStartTime = this.audioContext.currentTime + this.bufferTime;
             setTimeout(() => {
-                this.setPlaybackState('playing');
+                if (this.playbackState === 'loading') {
+                    this.setPlaybackState('playing');
+                }
             }, this.bufferTime * 1000);
         }
 
@@ -131,6 +133,7 @@ export class LiveMusicHelper extends EventTarget {
         if (this.extraDestination) this.outputNode.connect(this.extraDestination);
         this.outputNode.connect(this.mediaStreamDestination);
         
+        this.outputNode.gain.cancelScheduledValues(this.audioContext.currentTime);
         this.outputNode.gain.setValueAtTime(0, this.audioContext.currentTime);
         this.outputNode.gain.linearRampToValueAtTime(1, this.audioContext.currentTime + 0.1);
     }
@@ -138,21 +141,26 @@ export class LiveMusicHelper extends EventTarget {
     pause() {
         if (this.session) this.session.pause();
         this.setPlaybackState('paused');
-        this.outputNode.gain.setValueAtTime(1, this.audioContext.currentTime);
-        this.outputNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.1);
-        this.nextStartTime = 0;
-        this.outputNode = this.audioContext.createGain();
-    }
-
-    stop() {
-        if (this.session) this.session.stop();
-        this.setPlaybackState('stopped');
-        if (this.outputNode.gain) {
+        if (this.audioContext.state === 'running') {
+            this.outputNode.gain.cancelScheduledValues(this.audioContext.currentTime);
             this.outputNode.gain.setValueAtTime(this.outputNode.gain.value, this.audioContext.currentTime);
             this.outputNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.1);
         }
         this.nextStartTime = 0;
-        this.session = null;
+    }
+
+    stop() {
+        if (this.session) {
+            this.session.stop();
+            this.session = null;
+        }
+        this.setPlaybackState('stopped');
+        if (this.audioContext.state === 'running' && this.outputNode.gain) {
+            this.outputNode.gain.cancelScheduledValues(this.audioContext.currentTime);
+            this.outputNode.gain.setValueAtTime(this.outputNode.gain.value, this.audioContext.currentTime);
+            this.outputNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.1);
+        }
+        this.nextStartTime = 0;
         this.sessionPromise = null;
     }
 
