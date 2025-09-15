@@ -114,7 +114,7 @@ export class PromptDjMidi extends LitElement {
     }
 
     handlePromptChanged(e) {
-        const { promptId, text, weight, cc } = e.detail;
+        const { promptId, text, weight, cc, color } = e.detail;
         const prompt = this.prompts.get(promptId);
         if (!prompt) {
             console.error('prompt not found', promptId);
@@ -123,12 +123,13 @@ export class PromptDjMidi extends LitElement {
         prompt.text = text;
         prompt.weight = weight;
         prompt.cc = cc;
-        const newPrompts = new Map(this.prompts);
-        newPrompts.set(promptId, prompt);
-        this.prompts = newPrompts;
+        prompt.color = color;
+        // Re-assign to trigger Lit update
+        this.prompts = new Map(this.prompts);
         this.dispatchEvent(new CustomEvent('prompts-changed', { detail: this.prompts }));
     }
 
+    /** Generates radial gradients for each prompt based on weight and color. */
     makeBackground = throttle(() => {
         const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
         const MAX_WEIGHT = 0.5;
@@ -136,7 +137,9 @@ export class PromptDjMidi extends LitElement {
         const bg = [];
         [...this.prompts.values()].forEach((p, i) => {
             const alphaPct = clamp01(p.weight / MAX_WEIGHT) * MAX_ALPHA;
-            const alpha = Math.round(alphaPct * 0xff).toString(16).padStart(2, '0');
+            const alpha = Math.round(alphaPct * 0xff)
+                .toString(16)
+                .padStart(2, '0');
             const stop = p.weight / 2;
             const x = (i % 4) / 3;
             const y = Math.floor(i / 4) / 3;
@@ -157,7 +160,8 @@ export class PromptDjMidi extends LitElement {
             const inputIds = await this.midiDispatcher.getMidiAccess();
             this.midiInputIds = inputIds;
             this.activeMidiInputId = this.midiDispatcher.activeMidiInputId;
-        } catch (e) {
+        }
+        catch (e) {
             this.showMidi = false;
             this.dispatchEvent(new CustomEvent('error', { detail: e.message }));
         }
@@ -212,9 +216,11 @@ export class PromptDjMidi extends LitElement {
                 this.prompts = newPrompts;
                 this.dispatchEvent(new CustomEvent('prompts-changed', { detail: this.prompts }));
                 this.dispatchEvent(new CustomEvent('info', { detail: 'Set loaded successfully!' }));
-            } catch (err) {
+            }
+            catch (err) {
                 this.dispatchEvent(new CustomEvent('error', { detail: `Error loading set: ${err.message}` }));
-            } finally {
+            }
+            finally {
                 input.value = '';
             }
         };
@@ -228,7 +234,8 @@ export class PromptDjMidi extends LitElement {
         if (this.isRecording) {
             this.dispatchEvent(new CustomEvent('stop-recording'));
             this.isRecording = false;
-        } else {
+        }
+        else {
             if (this.playbackState !== 'playing' && this.playbackState !== 'loading') {
                 this.dispatchEvent(new CustomEvent('error', { detail: 'Please start playback before recording.' }));
                 return;
@@ -285,17 +292,16 @@ export class PromptDjMidi extends LitElement {
     renderPrompts() {
         return [...this.prompts.values()].map((prompt) => {
             return html`<prompt-controller
-        .promptId=${prompt.promptId}
-        ?filtered=${this.filteredPrompts.has(prompt.text)}
-        .cc=${prompt.cc}
-        .text=${prompt.text}
-        .weight=${prompt.weight}
-        .color=${prompt.color}
-        .midiDispatcher=${this.midiDispatcher}
-        .showCC=${this.showMidi}
-        .audioLevel=${this.audioLevel}
-        @prompt-changed=${this.handlePromptChanged}>
-      </prompt-controller>`;
+                .promptId=${prompt.promptId}
+                ?filtered=${this.filteredPrompts.has(prompt.text)}
+                .cc=${prompt.cc}
+                .text=${prompt.text}
+                .weight=${prompt.weight}
+                .color=${prompt.color}
+                .midiDispatcher=${this.midiDispatcher}
+                .showCC=${this.showMidi}
+                @prompt-changed=${this.handlePromptChanged}>
+            </prompt-controller>`;
         });
     }
 }
